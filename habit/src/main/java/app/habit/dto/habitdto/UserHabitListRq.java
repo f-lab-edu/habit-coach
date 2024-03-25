@@ -1,4 +1,4 @@
-package app.habit.dto;
+package app.habit.dto.habitdto;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -7,8 +7,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-public class PhaseQuestionRs {
+public class UserHabitListRq {
 
-    private String questionKey;
-    private String question;
+    private long userId;
 }

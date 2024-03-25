@@ -1,4 +1,4 @@
-package app.habit.dto;
+package app.habit.dto.openaidto;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

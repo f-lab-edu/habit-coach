@@ -1,4 +1,4 @@
-package app.habit.dto;
+package app.habit.dto.openaidto;
 
 import java.util.List;
 import lombok.AllArgsConstructor;
@@ -14,5 +14,4 @@ public class UserHabitPreQuestionRs {
     private String key;
     private String subject;
     private List<PhaseQuestionRs> questions;
-    
 }
