@@ -8,36 +8,39 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class EvaluationGptCoach {
 
     @Value("${app.api-key}")
     private String apiKey;
 
-    private final RestTemplate restTemplate;
-
-    public PhaseEvaluationRs requestEvaluation(RequestPrompt requestBody, String url) {
-        GptRsWrapper adviceBody = writeAdvice(requestBody, url);
+    public CompletableFuture<PhaseEvaluationRs> requestEvaluation(RequestPrompt requestBody, String url) {
+        log.info("EvaluationGptCoach.requestEvaluation : " + Thread.currentThread().getName());
+        CompletableFuture<GptRsWrapper> adviceBody = writeAdvice(requestBody, url);
         return parseAdvice(adviceBody);
     }
 
-    private GptRsWrapper writeAdvice(RequestPrompt requestBody, String url) {
-        return Optional.ofNullable(requestBody)
-                .map(body -> new HttpEntity<>(body, createHeaders()))
-                .map(entity -> restTemplate.exchange(url, HttpMethod.POST, entity, GptRsWrapper.class))
-                .map(HttpEntity::getBody)
-                .orElseThrow(NullPointerException::new);
+    private CompletableFuture<GptRsWrapper> writeAdvice(RequestPrompt requestBody, String url) {
+        return WebClient.create()
+                .post()
+                .uri(url)
+                .body(Mono.justOrEmpty(requestBody), RequestPrompt.class)
+                .headers(httpHeaders -> httpHeaders.addAll(createHeaders()))
+                .retrieve()
+                .bodyToMono(GptRsWrapper.class)
+                .toFuture();
     }
 
     private HttpHeaders createHeaders() {
@@ -48,16 +51,19 @@ public class EvaluationGptCoach {
         return headers;
     }
 
-    private PhaseEvaluationRs parseAdvice(GptRsWrapper body) {
-        Message message = body.getChoices().get(0).getMessage();
-        String content = message.getContent();
-        TypeReference<PhaseEvaluationRs> typeReference = new TypeReference<>() {
-        };
-        ObjectMapper objectMapper = new ObjectMapper();
-        try {
-            return objectMapper.readValue(content, typeReference);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    private CompletableFuture<PhaseEvaluationRs> parseAdvice(CompletableFuture<GptRsWrapper> futureBody) {
+        return futureBody.thenApplyAsync(gptRsWrapper -> {
+            log.info("EvaluationGptCoach.parseAdvice : " + Thread.currentThread().getName());
+            Message message = gptRsWrapper.getChoices().get(0).getMessage();
+            String content = message.getContent();
+            TypeReference<PhaseEvaluationRs> typeReference = new TypeReference<>() {
+            };
+            ObjectMapper objectMapper = new ObjectMapper();
+            try {
+                return objectMapper.readValue(content, typeReference);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 }
